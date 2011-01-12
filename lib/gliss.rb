@@ -18,26 +18,33 @@
 # limitations under the License.
 
 require 'grit'
+require 'optparse'
 
 module Gliss
   Gloss = Struct.new(:sha, :tag, :text)
   CommitMsg = Struct.new(:sha, :log)
-  GLOSS_RE = /^===(-?)(.*?)===(.*)/
-  INDENT_RE = /^(\s+)(.*)?/
+  GLOSS_RE=/^((?:[^\s]){3})(-?)(.*?)\1(.*)/
+  GLOSS_TAG=3
+  GLOSS_TEXT=4
+  GLOSS_STRIP=2
+  INDENT_RE=/^(\s+)(.*)$/
+  INDENT_AMOUNT=1
+  INDENTED_TEXT=2
 
   def self.commits_between(repo, older, newer)
     if repo.is_a?(String)
       repo = Grit::Repo.new(repo)
     end
 
-    repo.commit_deltas_from(repo, older, newer).map do |commit_obj|
+    commits = repo.commit_deltas_from(repo, older, newer).sort_by {|c| c.committed_date}
+    commits.map do |commit_obj|
       CommitMsg.new(commit_obj.sha, commit_obj.message)
     end
   end
 
   def self.glosses_between(repo, older, newer)
-    commits_between(repo, older, newer).inject([]) do |acc, val|
-      # XXX
+    commits_between(repo, older, newer).inject([]) do |acc, commit|
+      acc + glosses_in(commit.log, commit.sha)
     end
   end
 
@@ -47,13 +54,15 @@ module Gliss
     indent_matcher = nil
 
     message.each_line do |line|
+      line.chomp!
       match = nil
       if continuing
-        match = indent_matcher ? line.match(indent_matcher) : line.match(INDENT_RE)
+        match = line.match((indent_matcher || INDENT_RE))
         
         if match
-          indent_matcher = /^(#{match[1]})(.*)$/
-          result[-1].text << " " << match[2]
+          indent_matcher ||= /^(#{match[INDENT_AMOUNT]})(.*)$/
+          text = match[INDENTED_TEXT].strip
+          result[-1].text << text
         else
           indent_matcher = nil
           continuing = false
@@ -63,10 +72,13 @@ module Gliss
       match = line.match(GLOSS_RE)
       if match
         continuing = true
-        puts "matched a gloss with tag '#{match[2]}' and first line '#{match[3]}'"
-        result << Gloss.new(sha, match[2], match[3])
+        indent_matcher = nil
+        tag = match[GLOSS_TAG].strip
+        text = match[GLOSS_TEXT].strip
+        result << Gloss.new(sha, tag, [text])
       end
     end
-    result
+
+    result.each {|g| g.text.reject! {|t| t == ''}; g.text = g.text.join(" ")}
   end
 end
