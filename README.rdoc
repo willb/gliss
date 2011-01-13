@@ -1,17 +1,22 @@
 = gliss
 
-Description goes here.
+Gliss is a portmanteau (one might say "portamento," were one inclined to terrible puns) of "git," "lightweight," and "gloss."  It enables you to put tagged notes in git commit messages and then to extract these later.  
 
-== Note on Patches/Pull Requests
+A gliss gloss begins on a line by itself with three identical characters, followed by a tag name, followed by the three characters that started the line.  For example, `===EXAMPLE===' would begin a gliss gloss tagged `EXAMPLE`.  After the tag name, you may place text to be associated with the tag for this commit.  If the first line after the line containing the tag begins with an indent, its text will be considered to be part of the gloss text, and so on for any line immediately succeeding gloss text that is indented at least as much as the first line after the tagged line.
+
+You may then inspect the gliss glosses in your repo by running `gliss FROM TO`, where `FROM` and `TO` are branches, tags, or SHAs; gliss will show all the glosses in commits reachable from `TO` that are not reachable from `FROM`.  
+
+Gliss supports options for filtering glosses by tag and running in a different repo; try `gliss -h` for help.
+
+== How to contribute
  
 * Fork the project.
-* Make your feature addition or bug fix.
-* Add tests for it. This is important so I don't break it in a
-  future version unintentionally.
-* Commit, do not mess with rakefile, version, or history.
-  (if you want to have your own version, that is fine but bump version in a commit by itself I can ignore when I pull)
-* Send me a pull request. Bonus points for topic branches.
+* Make your feature addition or bug fix, ideally on a sensibly-named topic branch.
+* Add tests for it, ideally in separate spec files.
+* Don't change VERSION.
 
 == Copyright
 
-Copyright (c) 2011 Will Benton. See LICENSE for details.
+Copyright (c) 2011 Red Hat, Inc., and William C. Benton. See LICENSE for details.
+
+Gliss uses Grit, which is copyright (c) 2010 Tom Preston-Werner.
