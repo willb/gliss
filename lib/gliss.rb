@@ -31,6 +31,12 @@ module Gliss
   INDENT_AMOUNT=1
   INDENTED_TEXT=2
 
+  def self.glosses_between(repo, older, newer)
+    commits_between(repo, older, newer).inject([]) do |acc, commit|
+      acc + glosses_in(commit.log, commit.sha)
+    end
+  end
+
   def self.commits_between(repo, older, newer)
     if repo.is_a?(String)
       repo = Grit::Repo.new(repo)
@@ -39,12 +45,6 @@ module Gliss
     commits = repo.commit_deltas_from(repo, older, newer).sort_by {|c| c.committed_date}
     commits.map do |commit_obj|
       CommitMsg.new(commit_obj.sha, commit_obj.message)
-    end
-  end
-
-  def self.glosses_between(repo, older, newer)
-    commits_between(repo, older, newer).inject([]) do |acc, commit|
-      acc + glosses_in(commit.log, commit.sha)
     end
   end
 
@@ -80,5 +80,68 @@ module Gliss
     end
 
     result.each {|g| g.text.reject! {|t| t == ''}; g.text = g.text.join(" ")}
+  end
+  
+  class App
+    def initialize(args=nil)
+      @args = (args || ARGV.dup)
+    end
+    
+    def main
+      begin
+        process_args
+        r = Grit::Repo.new(@repo)
+        output_glosses(r)
+      rescue Exception=>ex
+        puts "fatal:  #{ex.inspect}"
+      end
+    end
+    
+    private
+    def output_glosses(repo)
+      Gliss::glosses_between(repo, @from, @to).each do |gloss|
+        if gloss.tag =~ @filter
+          sha = gloss.sha.slice(0,8)
+          tag = gloss.tag
+          msg = gloss.text
+          puts "#{sha} (#{tag})"
+          msg.each_line {|line| puts "  #{line.chomp}"}
+        end
+      end 
+    end
+    
+    def process_args
+      @repo = "."
+      @filter = /.*/
+      
+      oparser.parse!(@args)
+      unless @args.size <= 2 && @args.size >= 1
+        puts "fatal:  you must specify at least one branch or tag name"
+        puts oparser
+        exit(1)
+      end
+      
+      @from, @to = @args
+      @to ||= "master"
+    end
+    
+    def oparser
+      @oparser ||= OptionParser.new do |opts|
+        opts.banner = "gliss [options] FROM [TO]\nDisplays all gliss-formatted glosses reachable from TO but not from FROM.\nIf TO is not specified, use \"master\"."
+        
+        opts.on("-h", "--help", "Displays this message") do
+          puts opts
+          exit
+        end
+        
+        opts.on("-r REPO", "--repo REPO", "Runs in the given repo (default is \".\")") do |repo|
+          @repo = repo
+        end
+        
+        opts.on("-f REGEX", "--filter REGEX", "Output only messages with tags matching REGEX", "(default is all tags)") do |filter|
+          @filter = Regexp.new(filter)
+        end
+      end
+    end
   end
 end
