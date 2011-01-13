@@ -2,7 +2,7 @@
 #
 # lightweight glossing for git commit messages
 #
-# Copyright (c) 2011 Red Hat, Inc.
+# Copyright (c) 2011 Red Hat, Inc. and William C. Benton
 # Author:  William Benton (willb@redhat.com)
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
