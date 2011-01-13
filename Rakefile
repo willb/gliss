@@ -5,8 +5,8 @@ begin
   require 'jeweler'
   Jeweler::Tasks.new do |gem|
     gem.name = "gliss"
-    gem.summary = %Q{TODO: one-line summary of your gem}
-    gem.description = %Q{TODO: longer description of your gem}
+    gem.summary = %Q{gliss is a tool for inspecting lightweight annotations in a git repository}
+    gem.description = %Q{gliss is a tool for inspecting lightweight annotations, called "glosses," in a git repository.  The annotation format used by gliss is simple and human-readable.  You can use gliss glosses to streamline, e.g., producing upgrade notes as part of a release process.}
     gem.email = "willb@redhat.com"
     gem.homepage = "http://github.com/willb/gliss"
     gem.authors = ["Will Benton"]
