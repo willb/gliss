@@ -19,6 +19,7 @@
 
 require 'grit'
 require 'optparse'
+require 'set'
 
 module Gliss
   Gloss = Struct.new(:sha, :tag, :text)
@@ -30,6 +31,8 @@ module Gliss
   INDENT_RE=/^(\s+)(.*)$/
   INDENT_AMOUNT=1
   INDENTED_TEXT=2
+
+  attr_reader :filter
 
   def self.glosses_between(repo, older, newer)
     commits_between(repo, older, newer).inject([]) do |acc, commit|
@@ -90,8 +93,10 @@ module Gliss
     def main
       begin
         process_args
-        r = Grit::Repo.new(@repo)
-        output_glosses(r)
+        @the_repo = Grit::Repo.new(@repo)
+        output_glosses(@the_repo)
+      rescue SystemExit=>ex
+          exit!(ex.status)
       rescue Exception=>ex
         puts "fatal:  #{ex.inspect}"
       end
@@ -101,11 +106,7 @@ module Gliss
     def output_glosses(repo)
       Gliss::glosses_between(repo, @from, @to).each do |gloss|
         if gloss.tag =~ @filter
-          sha = gloss.sha.slice(0,8)
-          tag = gloss.tag
-          msg = gloss.text
-          puts "#{sha} (#{tag})"
-          msg.each_line {|line| puts "  #{line.chomp}"}
+          @output_proc.call(gloss)
         end
       end 
     end
@@ -113,6 +114,13 @@ module Gliss
     def process_args
       @repo = "."
       @filter = /.*/
+      @output_proc = Proc.new do |gloss|
+        sha = gloss.sha.slice(0,8)
+        tag = gloss.tag
+        msg = gloss.text
+        puts "#{sha} (#{tag})"
+        msg.each_line {|line| puts "  #{line.chomp}"}
+      end
       
       oparser.parse!(@args)
       unless @args.size <= 2 && @args.size >= 1
@@ -140,6 +148,20 @@ module Gliss
         
         opts.on("-f REGEX", "--filter REGEX", "Output only messages with tags matching REGEX", "(default is all tags)") do |filter|
           @filter = Regexp.new(filter)
+        end
+        
+        opts.on("-w", "--whole-commit", "Output entire commit messages that contain glosses") do
+          @seen_messages = Set.new
+          @output_proc = Proc.new do |gloss|
+            unless @seen_messages.include?(gloss.sha)
+              @seen_messages << gloss.sha
+              commit, = @the_repo.commits(gloss.sha)
+              sha = commit.to_s.slice(0,8)
+              # puts commit.inspect
+              puts sha
+              commit.message.each_line {|line| puts "  #{line}"}
+            end
+          end
         end
       end
     end
