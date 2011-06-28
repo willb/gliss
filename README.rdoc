@@ -1,12 +1,22 @@
 = gliss
 
-Gliss is a portmanteau (one might say "portamento," were one inclined to terrible puns) of "git," "lightweight," and "gloss."  It enables you to put tagged notes in git commit messages and then to extract these later.  
+Gliss enables you to put tagged notes in git commit messages and then to extract these later.  
 
 A gliss gloss begins on a line by itself with three identical characters, followed by a tag name, followed by the three characters that started the line.  For example, `===EXAMPLE===' would begin a gliss gloss tagged `EXAMPLE`.  After the tag name, you may place text to be associated with the tag for this commit.  If the first line after the line containing the tag begins with an indent, its text will be considered to be part of the gloss text, and so on for any line immediately succeeding gloss text that is indented at least as much as the first line after the tagged line.
 
 You may then inspect the gliss glosses in your repo by running `gliss FROM TO`, where `FROM` and `TO` are branches, tags, or SHAs; gliss will show all the glosses in commits reachable from `TO` that are not reachable from `FROM`.  
 
 Gliss supports options for filtering glosses by tag and running in a different repo; try `gliss -h` for help.
+
+== Frequently Anticipated Questions
+
+Q:  What does "gliss" mean?
+
+A:  Gliss is a portmanteau (one might say "portamento," were one inclined to terrible puns) of "git," "lightweight," and "gloss."
+
+Q:  Hey dummy, haven't you heard of `git note`?
+
+A:  Sadly, not everyone is using a sufficiently modern version of git to benefit from git notes.  Even if we can use git notes for annotations, we still need some way to distinguish typed annotations from general notes and comments.  We expect that a future release of gliss will support glosses contained in git notes.
 
 == How to contribute
  
