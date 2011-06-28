@@ -113,7 +113,6 @@ module Gliss
     
     def process_args
       @repo = "."
-      @filter = /.*/
       @output_proc = Proc.new do |gloss|
         sha = gloss.sha.slice(0,8)
         tag = gloss.tag
@@ -128,6 +127,8 @@ module Gliss
         puts oparser
         exit(1)
       end
+
+      @filter ||= /.*/
       
       @from, @to = @args
       @to ||= "master"
@@ -147,7 +148,8 @@ module Gliss
         end
         
         opts.on("-f REGEX", "--filter REGEX", "Output only messages with tags matching REGEX", "(default is all tags)") do |filter|
-          @filter = Regexp.new(filter)
+          new_filter = Regexp.new(filter)
+          @filter = @filter ? Regexp.union(@filter, new_filter) : new_filter
         end
         
         opts.on("-w", "--whole-commit", "Output entire commit messages that contain glosses") do
