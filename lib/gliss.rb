@@ -24,19 +24,25 @@ require 'set'
 module Gliss
   Gloss = Struct.new(:sha, :tag, :text)
   CommitMsg = Struct.new(:sha, :log)
-  GLOSS_RE=/^((?:[^\s]){3})(-?)(.*?)\1(.*)/
-  GLOSS_TAG=3
-  GLOSS_TEXT=4
-  GLOSS_STRIP=2
-  INDENT_RE=/^(\s+)(.*)$/
+  GLOSS_TAG_RE=/((?:[^\s]){3})(-?)(.*?)\2(.*)/
+  GLOSS_INDENTED_RE=/^(\s*)#{GLOSS_TAG_RE}/
+  GLOSS_MIDLINE_RE=/^(.*?)#{GLOSS_TAG_RE}/
+  GLOSS_RE=/^()#{GLOSS_TAG_RE}/
+  
+  GLOSS_TAG=4
+  GLOSS_TEXT=5
+  GLOSS_STRIP=3
+  GLOSS_BEFORE=1
+
+  BARE_INDENT_RE=/(\s+)(.*)/
   INDENT_AMOUNT=1
   INDENTED_TEXT=2
 
   attr_reader :filter
 
-  def self.glosses_between(repo, older, newer)
+  def self.glosses_between(repo, older, newer, allow_indented=false)
     commits_between(repo, older, newer).inject([]) do |acc, commit|
-      acc + glosses_in(commit.log, commit.sha)
+      acc + glosses_in(commit.log, commit.sha, allow_indented)
     end
   end
 
@@ -51,19 +57,20 @@ module Gliss
     end
   end
 
-  def self.glosses_in(message, sha=nil)
+  def self.glosses_in(message, sha=nil, allow_indented=false)
     result = []
     continuing = false
+    ws = ""
     indent_matcher = nil
 
     message.each_line do |line|
       line.chomp!
       match = nil
       if continuing
-        match = line.match((indent_matcher || INDENT_RE))
+        match = line.match((indent_matcher || /^(?:#{ws})#{BARE_INDENT_RE}$/))
         
         if match
-          indent_matcher ||= /^(#{match[INDENT_AMOUNT]})(.*)$/
+          indent_matcher ||= /^(?:#{ws})(#{match[INDENT_AMOUNT]})(.*)$/
           text = match[INDENTED_TEXT].strip
           result[-1].text << text
         else
@@ -72,19 +79,36 @@ module Gliss
         end
       end
           
-      match = line.match(GLOSS_RE)
+      match = begins_gloss(line, sha, allow_indented)
       if match
-        continuing = true
-        indent_matcher = nil
-        tag = match[GLOSS_TAG].strip
-        text = match[GLOSS_TEXT].strip
-        result << Gloss.new(sha, tag, [text])
+        continuing, indent_matcher, ws, new_gloss = match
+        result << new_gloss
       end
     end
 
     result.each {|g| g.text.reject! {|t| t == ''}; g.text = g.text.join(" ")}
   end
   
+  def self.begins_gloss(line, sha, allow_indented=false)
+    match = line.match(allow_indented ? GLOSS_INDENTED_RE : GLOSS_RE)
+    if match
+      ws = match[GLOSS_BEFORE]
+      tag = match[GLOSS_TAG].strip
+      text = match[GLOSS_TEXT].strip
+      return [true, nil, ws, Gloss.new(sha, tag, [text])]
+    end
+    nil
+  end
+  
+  def self.split_glosses(gloss, split_glosses=false)
+    if split_glosses
+      # XXX
+      yield gloss
+    else
+      yield gloss
+    end
+  end
+
   class App
     def initialize(args=nil)
       @args = (args || ARGV.dup)
@@ -104,9 +128,11 @@ module Gliss
     
     private
     def output_glosses(repo)
-      Gliss::glosses_between(repo, @from, @to).each do |gloss|
-        if gloss.tag =~ @filter
-          @output_proc.call(gloss)
+      Gliss::glosses_between(repo, @from, @to, @allow_indented_glosses).each do |gloss|
+        Gliss::split_glosses(gloss, @split_glosses) do |gl|
+          if gl.tag =~ @filter
+            @output_proc.call(gl)
+          end
         end
       end 
     end
@@ -150,6 +176,19 @@ module Gliss
         opts.on("-f REGEX", "--filter REGEX", "Output only messages with tags matching REGEX", "(default is all tags)") do |filter|
           new_filter = Regexp.new(filter)
           @filter = @filter ? Regexp.union(@filter, new_filter) : new_filter
+        end
+        
+        opts.on("--split-glosses", "Attempt to find multiple glosses in a line") do
+          @split_glosses = true
+        end
+        
+        opts.on("--allow-indented-glosses", "Find glosses that don't begin at the beginning of a line") do
+          @allow_indented_glosses = true
+        end
+        
+        opts.on("--permissive", "Implies --split-glosses and --allow-indented-glosses") do
+          @split_glosses = true
+          @allow_indented_glosses = true
         end
         
         opts.on("-w", "--whole-commit", "Output entire commit messages that contain glosses") do

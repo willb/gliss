@@ -17,6 +17,13 @@ This line does not contain a gloss.
   
   This is a gloss in paragraph format.
   This is a good format for longer comments.
+===UGH=== this is a gloss that has a ===MALFORMED=== gloss attached
+
+Foo
+
+  ===INDENTED=== this should only be a gloss if indenting is allowed
+  ===INDENTED2=== this should not be part of the preceding gloss
+    but these lines should be appended on
 END
   
   before(:each) do
@@ -25,6 +32,32 @@ END
   
   it "correctly identifies single-line glosses" do
     @glosses.select {|g| g.tag == "FOO" && g.text == "is an example gloss of type FOO"}.size.should == 1
+  end
+
+  it "does not spuriously identify indented glosses" do
+    @glosses.select {|g| g.tag == "INDENTED"}.size.should == 0
+    @glosses.select {|g| g.tag == "INDENTED2"}.size.should == 0
+  end
+
+  it "correctly identifies indented glosses when told to" do
+    @glosses = Gliss.glosses_in(TEST_MESSAGE, nil, true)
+    @glosses.select {|g| g.tag == "INDENTED"}.size.should == 1
+  end
+  
+  it "correctly identifies consecutive indented glosses" do
+    @glosses = Gliss.glosses_in(TEST_MESSAGE, nil, true)
+    puts @glosses.map {|g| g.tag}.inspect
+    @glosses.select {|g| g.tag == "INDENTED"}.size.should == 1
+    @glosses.select {|g| g.tag == "INDENTED" && g.text == "this should only be a gloss if indenting is allowed"}.size.should == 1
+    @glosses.select {|g| g.tag == "INDENTED" && g.text =~ /INDENTED2/}.size.should == 0
+    @glosses.select {|g| g.tag == "INDENTED2"}.size.should == 1
+    @glosses.select {|g| g.tag == "INDENTED2" && g.text =~ /not be part of the preceding gloss/}.size.should == 1
+  end
+
+  it "correctly identifies indented multiline glosses when told to" do
+    @glosses = Gliss.glosses_in(TEST_MESSAGE, nil, true)
+    @glosses.select {|g| g.tag == "INDENTED2"}.size.should == 1
+    @glosses.select {|g| g.tag == "INDENTED2" && g.text =~ /but these lines should be appended on/}.size.should == 1
   end
   
   it "correctly identifies multiple-line glosses" do
@@ -46,7 +79,7 @@ END
   end
   
   it "finds multiple glosses in a message" do
-    @glosses.size.should == 5
+    @glosses.size.should == 6
   end
   
   it "does not create spurious glosses" do
