@@ -19,6 +19,11 @@ This line does not contain a gloss.
   This is a good format for longer comments.
 ===UGH=== this is a gloss that has a ===MALFORMED=== gloss attached
 
+===YUCK=== this is a gloss that has two ===MALFORMED=== glosses attached ===TO=== it
+
+===BLEAH=== this is a gloss that has two ===MALFORMED=== glosses attached 
+   ===ONE=== of which is on the second line
+
 Foo
 
   ===INDENTED=== this should only be a gloss if indenting is allowed
@@ -42,6 +47,25 @@ END
     splits[1].text.should == "gloss attached"
     splits[1].tag.should == "MALFORMED"
   end
+
+  it "correctly splits malformed glosses with more than one midline gloss when asked to" do
+    yuck = @glosses.select {|g| g.tag == "YUCK"}
+    yuck.size.should == 1
+    splits = Gliss::split_glosses(yuck[0], true)
+    splits.size.should == 3
+    splits.map{|g| g.tag}.should == %w{YUCK MALFORMED TO}
+    splits.map{|g| g.text}.should == ["this is a gloss that has two", "glosses attached", "it"]
+  end
+
+  it "correctly splits malformed glosses with more than one mid-multiline gloss gloss when asked to" do
+    bleah = @glosses.select {|g| g.tag == "BLEAH"}
+    bleah.size.should == 1
+    splits = Gliss::split_glosses(bleah[0], true)
+    splits.size.should == 3
+    splits.map{|g| g.tag}.should == %w{BLEAH MALFORMED ONE}
+    splits.map{|g| g.text}.should == ["this is a gloss that has two", "glosses attached", "of which is on the second line"]
+  end
+
   
   it "correctly identifies single-line glosses" do
     @glosses.select {|g| g.tag == "FOO" && g.text == "is an example gloss of type FOO"}.size.should == 1
@@ -91,7 +115,7 @@ END
   end
   
   it "finds multiple glosses in a message" do
-    @glosses.size.should == 6
+    @glosses.size.should == 8
   end
   
   it "does not create spurious glosses" do
