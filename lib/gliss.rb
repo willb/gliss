@@ -24,14 +24,14 @@ require 'set'
 module Gliss
   Gloss = Struct.new(:sha, :tag, :text)
   CommitMsg = Struct.new(:sha, :log)
-  GLOSS_TAG_RE=/((?:[^\s]){3})(-?)(.*?)\2(.*)/
+  GLOSS_TAG_RE=/(([^\s])\3\3)(-?)(.*?)\2(.*)/
   GLOSS_INDENTED_RE=/^(\s*)#{GLOSS_TAG_RE}/
   GLOSS_MIDLINE_RE=/^(.*?)#{GLOSS_TAG_RE}/
   GLOSS_RE=/^()#{GLOSS_TAG_RE}/
   
-  GLOSS_TAG=4
-  GLOSS_TEXT=5
-  GLOSS_STRIP=3
+  GLOSS_TAG=5
+  GLOSS_TEXT=6
+  GLOSS_STRIP=4
   GLOSS_BEFORE=1
 
   BARE_INDENT_RE=/(\s+)(.*)/
@@ -102,10 +102,30 @@ module Gliss
   
   def self.split_glosses(gloss, split_glosses=false)
     if split_glosses
-      # XXX
-      yield gloss
+      result_glosses = [gloss]
+      text = gloss.text
+      match = text.match(GLOSS_MIDLINE_RE)
+      while match
+        result_glosses[-1].text = match[GLOSS_BEFORE].strip if result_glosses[-1]
+        tag = match[GLOSS_TAG].strip
+        text = match[GLOSS_TEXT].strip
+        result_glosses << Gloss.new(gloss.sha, tag, text)
+        match = text.match(GLOSS_MIDLINE_RE)
+      end
+
+      if block_given?
+        result_glosses.each do |g|
+          yield g
+        end
+      else
+        result_glosses
+      end
     else
-      yield gloss
+      if block_given?
+        yield gloss
+      else
+        return [gloss]
+      end
     end
   end
 

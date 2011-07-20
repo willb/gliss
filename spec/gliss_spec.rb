@@ -24,10 +24,23 @@ Foo
   ===INDENTED=== this should only be a gloss if indenting is allowed
   ===INDENTED2=== this should not be part of the preceding gloss
     but these lines should be appended on
+
+abcCRUFTabc this should not be a gloss
 END
   
   before(:each) do
     @glosses = Gliss.glosses_in(TEST_MESSAGE)
+  end
+  
+  it "correctly splits glosses when asked to" do
+    ugh = @glosses.select {|g| g.tag == "UGH"}
+    ugh.size.should == 1
+    splits = Gliss::split_glosses(ugh[0], true)
+    splits.size.should == 2
+    splits[0].tag.should == "UGH"
+    splits[0].text.should == "this is a gloss that has a"
+    splits[1].text.should == "gloss attached"
+    splits[1].tag.should == "MALFORMED"
   end
   
   it "correctly identifies single-line glosses" do
@@ -46,7 +59,6 @@ END
   
   it "correctly identifies consecutive indented glosses" do
     @glosses = Gliss.glosses_in(TEST_MESSAGE, nil, true)
-    puts @glosses.map {|g| g.tag}.inspect
     @glosses.select {|g| g.tag == "INDENTED"}.size.should == 1
     @glosses.select {|g| g.tag == "INDENTED" && g.text == "this should only be a gloss if indenting is allowed"}.size.should == 1
     @glosses.select {|g| g.tag == "INDENTED" && g.text =~ /INDENTED2/}.size.should == 0
