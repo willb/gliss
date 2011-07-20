@@ -73,12 +73,13 @@ module Gliss
           indent_matcher ||= /^(?:#{ws})(#{match[INDENT_AMOUNT]})(.*)$/
           text = match[INDENTED_TEXT].strip
           result[-1].text << text
+          next
         else
           indent_matcher = nil
           continuing = false
         end
       end
-          
+      
       match = begins_gloss(line, sha, allow_indented)
       if match
         continuing, indent_matcher, ws, new_gloss = match
@@ -193,20 +194,20 @@ module Gliss
           @repo = repo
         end
         
-        opts.on("-f REGEX", "--filter REGEX", "Output only messages with tags matching REGEX", "(default is all tags)") do |filter|
+        opts.on("-f REGEX", "--filter REGEX", "Output only messages with tags matching", "REGEX (default is all tags)") do |filter|
           new_filter = Regexp.new(filter)
           @filter = @filter ? Regexp.union(@filter, new_filter) : new_filter
         end
         
-        opts.on("--split-glosses", "Attempt to find multiple glosses in a line") do
+        opts.on("--split-glosses", "Attempt to find multiple glosses in a line.", "Note that this option may return","spurious glosses") do
           @split_glosses = true
         end
         
-        opts.on("--allow-indented-glosses", "Find glosses that don't begin at the beginning of a line") do
+        opts.on("--allow-indented-glosses", "Find glosses that don't begin at","the beginning of a line") do
           @allow_indented_glosses = true
         end
         
-        opts.on("--permissive", "Implies --split-glosses and --allow-indented-glosses") do
+        opts.on("--permissive", "Find as many malformed glosses as possible.","Implies --allow-indented-glosses and", "--split-glosses") do
           @split_glosses = true
           @allow_indented_glosses = true
         end

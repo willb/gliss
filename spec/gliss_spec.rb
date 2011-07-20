@@ -33,6 +33,16 @@ Foo
 abcCRUFTabc this should not be a gloss
 END
   
+  SECOND_TEST = <<-END
+This is a test commit.
+  ===FOO=== this is a bogus gloss
+
+===BAR=== this is not a bogus gloss, but ===MIDLINE=== this is
+  ===MIDLINE2=== and so is this
+
+
+END
+  
   before(:each) do
     @glosses = Gliss.glosses_in(TEST_MESSAGE)
   end
@@ -66,6 +76,16 @@ END
     splits.map{|g| g.text}.should == ["this is a gloss that has two", "glosses attached", "of which is on the second line"]
   end
 
+  it "correctly operates in permissive mode" do
+    @glosses = Gliss.glosses_in(SECOND_TEST, nil, true)
+    @glosses.size.should == 2
+    bar = @glosses.select {|g| g.tag == "BAR"}
+    bar.size.should == 1
+    splits = Gliss::split_glosses(bar[0], true)
+    splits.size.should == 3
+    splits.map{|g| g.tag}.should == %w{BAR MIDLINE MIDLINE2}
+    splits.map{|g| g.text}.should == ["this is not a bogus gloss, but", "this is", "and so is this"]
+  end
   
   it "correctly identifies single-line glosses" do
     @glosses.select {|g| g.tag == "FOO" && g.text == "is an example gloss of type FOO"}.size.should == 1
