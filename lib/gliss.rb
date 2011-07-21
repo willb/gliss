@@ -20,6 +20,12 @@
 require 'grit'
 require 'optparse'
 require 'set'
+begin
+  require 'maruku'
+  $HAS_MARUKU=true
+rescue LoadError=>le
+  $HAS_MARUKU=false
+end
 
 module Gliss
   Gloss = Struct.new(:sha, :tag, :text)
@@ -131,6 +137,8 @@ module Gliss
   end
 
   class App
+    OUTPUT_KINDS=%w{html latex}
+    
     def initialize(args=nil)
       @args = (args || ARGV.dup)
     end
@@ -165,8 +173,16 @@ module Gliss
         tag = gloss.tag
         msg = gloss.text
         puts "#{sha} (#{tag})"
-        msg.each_line {|line| puts "  #{line.chomp}"}
+        if @format_glosses && tag =~ @output_tag_filter
+          puts Maruku.new(msg).send(@markdown_backend_msg)
+        else
+          msg.each_line {|line| puts "  #{line.chomp}"}
+        end
       end
+      
+      @output_filter_kind = :latex
+      @output_tag_filter = nil
+      @markdown_list = ""
       
       oparser.parse!(@args)
       unless @args.size <= 2 && @args.size >= 1
@@ -175,15 +191,24 @@ module Gliss
         exit(1)
       end
 
+      if @whole_commit && @format_glosses
+        puts "fatal:  --whole-commit is incompatible with --format-glosses-matching; please\nchoose at most one of these options"
+        exit(1)
+      end
+
       @filter ||= /.*/
       
       @from, @to = @args
       @to ||= "master"
+      
+      @markdown_backend_msg = "to_#{@output_filter_kind}#{@markdown_list}"
     end
     
     def oparser
       @oparser ||= OptionParser.new do |opts|
-        opts.banner = "gliss [options] FROM [TO]\nDisplays all gliss-formatted glosses reachable from TO but not from FROM.\nIf TO is not specified, use \"master\"."
+        opts.banner = "gliss [options] FROM [TO]\nDisplays all gliss-formatted glosses reachable from TO but not from FROM.\nTO and FROM are commit SHAs, branch names, or tag names.\nIf TO is not specified, gliss will use \"master\" as the TO argument."
+        
+        opts.separator("\nGeneral options:")
         
         opts.on("-h", "--help", "Displays this message") do
           puts opts
@@ -194,25 +219,15 @@ module Gliss
           @repo = repo
         end
         
-        opts.on("-f REGEX", "--filter REGEX", "Output only messages with tags matching", "REGEX (default is all tags)") do |filter|
+        opts.on("-f REGEX", "--filter REGEX", "Output only messages with tags matching", "REGEX (default is all tags).", "Applying this multiple times will select", "tags matching any supplied expression.") do |filter|
           new_filter = Regexp.new(filter)
           @filter = @filter ? Regexp.union(@filter, new_filter) : new_filter
         end
         
-        opts.on("--split-glosses", "Attempt to find multiple glosses in a line.", "Note that this option may return","spurious glosses") do
-          @split_glosses = true
-        end
+        opts.separator("\nFormatting options:")
         
-        opts.on("--allow-indented-glosses", "Find glosses that don't begin at","the beginning of a line") do
-          @allow_indented_glosses = true
-        end
-        
-        opts.on("--permissive", "Find as many malformed glosses as possible.","Implies --allow-indented-glosses and", "--split-glosses") do
-          @split_glosses = true
-          @allow_indented_glosses = true
-        end
-        
-        opts.on("-w", "--whole-commit", "Output entire commit messages that contain glosses") do
+        opts.on("-w", "--whole-commit", "Output entire commit messages that", "contain glosses") do
+          @whole_commit = true
           @seen_messages = Set.new
           @output_proc = Proc.new do |gloss|
             unless @seen_messages.include?(gloss.sha)
@@ -225,6 +240,38 @@ module Gliss
             end
           end
         end
+        
+        if $HAS_MARUKU
+          opts.on("--format-glosses-matching REGEX", "Apply Markdown formatting to tags matching", "REGEX (default is format no tags)", "Applying this multiple times will select", "tags matching any supplied expression.") do |re|
+            @format_glosses = true
+            new_oft_re = Regexp.new(re)
+            @output_tag_filter = @output_tag_filter ? Regexp.union(@output_tag_filter, new_oft_re) : new_oft_re
+          end
+          
+          opts.on("--markdown-output KIND", OUTPUT_KINDS, "Select the type of Markdown output","to generate: #{OUTPUT_KINDS.join(" or ")}. (The default","is latex)") do |ok|
+            @output_filter_kind = ok.to_sym
+          end
+          
+          opts.on("--markdown-as-list", "Output Markdown glosses as list items") {@markdown_list="_li"}
+        else
+          opts.separator("More formatting options are available if you install the maruku gem\nwith 'gem install maruku'")
+        end
+        
+        opts.separator("\nOptions to handle potentially-malformed input:")
+        
+        opts.on("--split-glosses", "Attempt to find multiple glosses in a", "line. Note that this option may return","spurious glosses") do
+          @split_glosses = true
+        end
+        
+        opts.on("--allow-indented-glosses", "Find glosses that don't begin at the","beginning of a line. Note that this","option may return spurious glosses.") do
+          @allow_indented_glosses = true
+        end
+        
+        opts.on("--permissive", "Find as many malformed gloss candidates as","possible. Implies --allow-indented-glosses", "and --split-glosses") do
+          @split_glosses = true
+          @allow_indented_glosses = true
+        end
+        
       end
     end
   end
